@@ -1,6 +1,5 @@
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy_serializer import SerializerMixin
-
 from config import db, bcrypt
 
 class User(db.Model, SerializerMixin):
@@ -31,17 +30,18 @@ class User(db.Model, SerializerMixin):
         return bcrypt.check_password_hash(
             self._password_hash, password.encode('utf-8')
         )
-    
+
 class Recipe(db.Model, SerializerMixin):
     __tablename__ = 'recipes'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     title = db.Column(db.String, nullable=False)
-    instructions = db.Column(db.String, db.CheckConstraint('length(instructions) >= 50'), nullable=False, )
+    instructions = db.Column(db.String, db.CheckConstraint('length(instructions) >= 50'), nullable=False)
     minutes_to_complete = db.Column(db.Integer)
 
     __table_args__ = (
-        db.CheckConstraint('length(instructions) >= 50'),)
+        db.CheckConstraint('length(instructions) >= 50'),
+    )
     
     user = db.relationship('User', back_populates='recipes')
