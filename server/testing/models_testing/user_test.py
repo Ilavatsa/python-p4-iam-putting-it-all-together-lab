@@ -1,12 +1,11 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
-from app import app
-from models import db, User, Recipe
+from app import app, db
+from models import User, Recipe
 
 @pytest.fixture(scope='module')
 def setup_app():
     '''Set up the Flask application context and create necessary tables.'''
-
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app_test.db'
     with app.app_context():
@@ -15,14 +14,15 @@ def setup_app():
         db.session.remove()
         db.drop_all()
 
+@pytest.fixture(scope='function', autouse=True)
+def clean_database():
+    '''Clean the database before each test function.'''
+    with app.app_context():
+        db.session.begin(nested=True)
+        yield
+        db.session.rollback()
+
 class TestUser:
-    def setup_method(self, method):
-        '''Ensure a clean state before each test method.'''
-
-        with app.app_context():
-            User.query.delete()
-            db.session.commit()
-
     def test_has_attributes(self, setup_app):
         with app.app_context():
             user = User(
@@ -64,54 +64,59 @@ class TestUser:
                 created_user.password_hash
 
     def test_requires_username(self, setup_app):
-        user = User()
-        with pytest.raises(IntegrityError):
+        with app.app_context():
+            user = User()
+            db.session.add(user)
+            with pytest.raises(IntegrityError):
+                db.session.commit()
+
+    def test_requires_unique_username(self, setup_app):
+        with app.app_context():
+            user_1 = User(username="Ben")
+            db.session.add(user_1)
+            db.session.commit()
+            
+            user_2 = User(username="Ben")
+            db.session.add(user_2)
+            with pytest.raises(IntegrityError):
+                db.session.commit()
+
+    def test_has_list_of_recipes(self, setup_app):
+        with app.app_context():
+            user = User(username="Prabhdip")
+            recipe_1 = Recipe(
+                title="Delicious Shed Ham",
+                instructions="""Or kind rest bred with am shed then. In""" + \
+                    """ raptures building an bringing be. Elderly is detract""" + \
+                    """ tedious assured private so to visited. Do travelling""" + \
+                    """ companions contrasted it. Mistress strongly remember""" + \
+                    """ up to. Ham him compass you proceed calling detract.""" + \
+                    """ Better of always missed we person mr. September""" + \
+                    """ smallness northward situation few her certainty""" + \
+                    """ something.""",
+                minutes_to_complete=60,
+            )
+            recipe_2 = Recipe(
+                title="Hasty Party Ham",
+                instructions="""As am hastily invited settled at limited""" + \
+                             """ civilly fortune me. Really spring in extent""" + \
+                             """ an by. Judge but built gay party world. Of""" + \
+                             """ so am he remember although required. Bachelor""" + \
+                             """ unpacked be advanced at. Confined in declared""" + \
+                             """ marianne is vicinity.""",
+                minutes_to_complete=30,
+            )
+
+            user.recipes.extend([recipe_1, recipe_2])
             db.session.add(user)
             db.session.commit()
 
-    def test_requires_unique_username(self, setup_app):
-        user_1 = User(username="Ben")
-        user_2 = User(username="Ben")
+            created_user = User.query.filter_by(username="Prabhdip").first()
 
-        with pytest.raises(IntegrityError):
-            db.session.add_all([user_1, user_2])
-            db.session.commit()
+            assert created_user is not None
+            assert recipe_1 in created_user.recipes
+            assert recipe_2 in created_user.recipes
+            assert created_user.recipes == [recipe_1, recipe_2]
 
-    def test_has_list_of_recipes(self, setup_app):
-        user = User(username="Prabhdip")
 
-        recipe_1 = Recipe(
-            title="Delicious Shed Ham",
-            instructions="""Or kind rest bred with am shed then. In""" + \
-                """ raptures building an bringing be. Elderly is detract""" + \
-                """ tedious assured private so to visited. Do travelling""" + \
-                """ companions contrasted it. Mistress strongly remember""" + \
-                """ up to. Ham him compass you proceed calling detract.""" + \
-                """ Better of always missed we person mr. September""" + \
-                """ smallness northward situation few her certainty""" + \
-                """ something.""",
-            minutes_to_complete=60,
-        )
-        recipe_2 = Recipe(
-            title="Hasty Party Ham",
-            instructions="""As am hastily invited settled at limited""" + \
-                         """ civilly fortune me. Really spring in extent""" + \
-                         """ an by. Judge but built gay party world. Of""" + \
-                         """ so am he remember although required. Bachelor""" + \
-                         """ unpacked be advanced at. Confined in declared""" + \
-                         """ marianne is vicinity.""",
-            minutes_to_complete=30,
-        )
 
-        user.recipes.append(recipe_1)
-        user.recipes.append(recipe_2)
-
-        db.session.add_all([user, recipe_1, recipe_2])
-        db.session.commit()
-
-        assert user.id
-        assert recipe_1.id
-        assert recipe_2.id
-
-        assert recipe_1 in user.recipes
-        assert recipe_2 in user.recipes
