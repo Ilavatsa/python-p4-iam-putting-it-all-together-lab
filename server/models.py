@@ -3,7 +3,7 @@ from sqlalchemy_serializer import SerializerMixin
 from config import db, bcrypt
 
 class Recipe(db.Model, SerializerMixin):
-    __tablename__ = 'recipes'
+    __tablename__ = 'ecipes'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -17,6 +17,12 @@ class Recipe(db.Model, SerializerMixin):
     
     user = db.relationship('User', back_populates='recipes')
 
+    @classmethod
+    def create(cls, **kwargs):
+        if len(kwargs.get('instructions', '')) < 50:
+            raise ValueError("Instructions must be at least 50 characters long")
+        return cls(**kwargs)
+    
 class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
 
