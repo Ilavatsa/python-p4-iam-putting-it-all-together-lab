@@ -7,7 +7,8 @@ from models import Recipe  # Import your models to be tested
 def setup_app():
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test_app.db'  # Use a separate test database
-    db.init_app(app)
+    if not app.extensions.get('sqlalchemy'):
+        db.init_app(app)
     with app.app_context():
         db.create_all()
 
@@ -58,3 +59,4 @@ class TestRecipe:
                 )
                 db.session.add(recipe)
                 db.session.commit()
+
